@@ -9,8 +9,9 @@ from bs4 import BeautifulSoup
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
+from google import genai  # <--- IMPORTED GOOGLE GENAI SDK
 
-from .models import WebsiteAudit  # <--- IMPORTED YOUR MODEL HERE
+from .models import WebsiteAudit
 
 from .scoring import (
     analyze_advanced_seo,
@@ -81,14 +82,9 @@ def health_check(request):
     Basic API health check.
     """
 
-    ollama_url = os.environ.get(
-        "OLLAMA_URL",
-        "http://127.0.0.1:11434",
-    )
-
-    ollama_model = os.environ.get(
-        "OLLAMA_MODEL",
-        "qwen2.5:7b",
+    gemini_model = os.environ.get(
+        "GEMINI_MODEL",
+        "gemini-2.5-flash",
     )
 
     return JsonResponse({
@@ -96,8 +92,8 @@ def health_check(request):
         "message": "AI Website Auditor API is running.",
         "version": "3.0.0",
         "ai_enabled": True,
-        "ollama_url": ollama_url,
-        "ollama_model": ollama_model,
+        "ai_provider": "google-gemini",
+        "gemini_model": gemini_model,
     })
 
 
@@ -298,22 +294,16 @@ def analyze_website(request):
         # CONTENT EXTRACTION (FOR AI SEMANTIC SCORING)
         # ----------------------------------------------------
         
-        # 1. Find all paragraph tags
         paragraphs = soup.find_all("p")
         
-        # 2. Extract clean text, ignoring empty paragraphs
         raw_text = " ".join([
             p.get_text(" ", strip=True) 
             for p in paragraphs 
             if p.get_text(" ", strip=True)
         ])
         
-        # 3. Calculate word count
         words = raw_text.split()
         word_count = len(words)
-        
-        # 4. Limit text to the first 1000 words 
-        # (This prevents overloading the Ollama AI with massive pages)
         extracted_text = " ".join(words[:1000])
 
         # ----------------------------------------------------
@@ -585,7 +575,7 @@ def analyze_website(request):
             title_length=len(title),
             description_length=len(description),
             recommendations=recommendations,
-            ai_insights={}  # Starts empty until the second endpoint generates it
+            ai_insights={}
         )
 
         # ----------------------------------------------------
@@ -595,7 +585,7 @@ def analyze_website(request):
         return JsonResponse(
             {
                 "status": "success",
-                "audit_id": audit_record.id,  # <-- NEW: Returning the DB ID
+                "audit_id": audit_record.id,
                 "scan_id": scan_id,
                 "analyzed_at": datetime.now(
                     timezone.utc
@@ -671,10 +661,6 @@ def analyze_website(request):
             },
         )
 
-    # --------------------------------------------------------
-    # WEBSITE ERRORS
-    # --------------------------------------------------------
-
     except requests.exceptions.Timeout:
 
         return JsonResponse({
@@ -730,139 +716,69 @@ def analyze_website(request):
 
 
 # ============================================================
-# AI INSIGHTS — OLLAMA / QWEN
+# AI INSIGHTS — GOOGLE GEMINI (FREE TIER)
 # ============================================================
 
 @csrf_exempt
 def ai_insights(request):
     """
     Generate AI-powered insights from an existing
-    website audit using Ollama + Qwen 2.5 7B.
+    website audit using Google Gemini SDK.
     """
 
-    # --------------------------------------------------------
-    # METHOD CHECK
-    # --------------------------------------------------------
-
     if request.method != "POST":
-
         return JsonResponse({
             "status": "error",
-            "message": (
-                "Only POST requests are allowed."
-            ),
+            "message": "Only POST requests are allowed.",
         }, status=405)
 
-    # --------------------------------------------------------
-    # OLLAMA CONFIGURATION
-    # --------------------------------------------------------
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        return JsonResponse({
+            "status": "unavailable",
+            "provider": "google-gemini",
+            "message": "GEMINI_API_KEY environment variable is not configured on the server.",
+        }, status=503)
 
-    ollama_url = os.environ.get(
-        "OLLAMA_URL",
-        "http://127.0.0.1:11434",
-    ).rstrip("/")
-
-    ollama_model = os.environ.get(
-        "OLLAMA_MODEL",
-        "qwen2.5:7b",
+    gemini_model = os.environ.get(
+        "GEMINI_MODEL",
+        "gemini-2.5-flash",
     )
 
-    # --------------------------------------------------------
-    # READ REQUEST
-    # --------------------------------------------------------
-
     try:
-
-        body = request.body.decode(
-            "utf-8"
-        ) or "{}"
-
+        body = request.body.decode("utf-8") or "{}"
         payload = json.loads(body)
-
-    except (
-        json.JSONDecodeError,
-        UnicodeDecodeError,
-    ):
-
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return JsonResponse({
             "status": "error",
             "message": "Invalid JSON body.",
         }, status=400)
 
-    # --------------------------------------------------------
-    # VALIDATE AUDIT
-    # --------------------------------------------------------
-
     audit = payload.get("audit")
-    audit_id = payload.get("audit_id")  # <--- NEW: GET DATABASE ID
+    audit_id = payload.get("audit_id")
 
     if not isinstance(audit, dict):
-
         return JsonResponse({
             "status": "error",
-            "message": (
-                "Provide an audit object."
-            ),
+            "message": "Provide an audit object.",
         }, status=400)
 
-    # --------------------------------------------------------
-    # PREPARE AUDIT DATA
-    # --------------------------------------------------------
-
-    recommendations = audit.get(
-        "recommendations",
-        [],
-    )
-
-    if not isinstance(
-        recommendations,
-        list,
-    ):
+    recommendations = audit.get("recommendations", [])
+    if not isinstance(recommendations, list):
         recommendations = []
 
     compact = {
-        "website": audit.get(
-            "website"
-        ),
-
-        "overall_score": audit.get(
-            "overall_score"
-        ),
-
-        "score_grade": audit.get(
-            "score_grade"
-        ),
-
-        "overall_status": audit.get(
-            "overall_status"
-        ),
-
-        "seo_score": audit.get(
-            "seo_score"
-        ),
-
-        "technical_seo_score": audit.get(
-            "technical_seo_score"
-        ),
-
-        "accessibility_score": audit.get(
-            "accessibility_score"
-        ),
-
-        "security_score": audit.get(
-            "security_score"
-        ),
-
-        "performance_score": audit.get(
-            "performance_score"
-        ),
-
+        "website": audit.get("website"),
+        "overall_score": audit.get("overall_score"),
+        "score_grade": audit.get("score_grade"),
+        "overall_status": audit.get("overall_status"),
+        "seo_score": audit.get("seo_score"),
+        "technical_seo_score": audit.get("technical_seo_score"),
+        "accessibility_score": audit.get("accessibility_score"),
+        "security_score": audit.get("security_score"),
+        "performance_score": audit.get("performance_score"),
         "recommendations": recommendations[:20],
     }
-
-    # --------------------------------------------------------
-    # AI PROMPT
-    # --------------------------------------------------------
 
     prompt = f"""
 You are a senior technical SEO, accessibility,
@@ -872,8 +788,7 @@ Analyze the website audit data below.
 
 Return ONLY valid JSON.
 
-Do not use Markdown.
-Do not use ```json.
+Do not use Markdown formatting blocks like ```json.
 Do not add explanations outside the JSON object.
 
 The JSON must contain exactly these top-level keys:
@@ -906,265 +821,70 @@ low
 
 Use only information supported by the audit data.
 
-Do not invent measurements, problems, scores,
-URLs, or technical details that are not present
-in the audit data.
-
 Audit data:
 
-{json.dumps(
-    compact,
-    ensure_ascii=False,
-    indent=2
-)}
+{json.dumps(compact, ensure_ascii=False, indent=2)}
 """.strip()
 
-    # --------------------------------------------------------
-    # OLLAMA REQUEST
-    # --------------------------------------------------------
-
-    ollama_endpoint = (
-        f"{ollama_url}/api/generate"
-    )
-
-    ollama_payload = {
-        "model": ollama_model,
-        "prompt": prompt,
-        "stream": False,
-        "format": "json",
-
-        "options": {
-            "temperature": 0.2,
-        },
-    }
-
     try:
-
-        result = requests.post(
-            ollama_endpoint,
-            json=ollama_payload,
-            timeout=300, # <--- NEW: INCREASED TIMEOUT TO 300 SECONDS
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model=gemini_model,
+            contents=prompt,
         )
+        raw_response = (response.text or "").strip()
 
-    # --------------------------------------------------------
-    # OLLAMA CONNECTION ERROR
-    # --------------------------------------------------------
-
-    except requests.exceptions.ConnectionError as error:
-
+    except Exception as error:
         return JsonResponse({
             "status": "unavailable",
-            "provider": "ollama",
-            "model": ollama_model,
-
-            "message": (
-                "Django could not connect to Ollama. "
-                f"Make sure Ollama is running at "
-                f"{ollama_url}."
-            ),
-
+            "provider": "google-gemini",
+            "model": gemini_model,
+            "message": "Failed to generate AI insights from Google Gemini.",
             "details": str(error),
         }, status=503)
 
-    # --------------------------------------------------------
-    # OLLAMA TIMEOUT
-    # --------------------------------------------------------
-
-    except requests.exceptions.Timeout as error:
-
-        return JsonResponse({
-            "status": "unavailable",
-            "provider": "ollama",
-            "model": ollama_model,
-
-            "message": (
-                "Ollama took too long to generate "
-                "the AI insights."
-            ),
-
-            "details": str(error),
-        }, status=504)
-
-    # --------------------------------------------------------
-    # OTHER REQUEST ERROR
-    # --------------------------------------------------------
-
-    except requests.exceptions.RequestException as error:
-
-        return JsonResponse({
-            "status": "unavailable",
-            "provider": "ollama",
-            "model": ollama_model,
-
-            "message": (
-                "The request to Ollama failed."
-            ),
-
-            "details": str(error),
-        }, status=503)
-
-    # --------------------------------------------------------
-    # CHECK OLLAMA HTTP STATUS
-    # --------------------------------------------------------
-
-    if not result.ok:
-
-        return JsonResponse({
-            "status": "error",
-            "provider": "ollama",
-            "model": ollama_model,
-
-            "message": (
-                "Ollama returned an error."
-            ),
-
-            "ollama_status": result.status_code,
-
-            "details": result.text[:2000],
-        }, status=502)
-
-    # --------------------------------------------------------
-    # PARSE OLLAMA RESPONSE
-    # --------------------------------------------------------
-
-    try:
-
-        response_body = result.json()
-
-    except ValueError:
-
-        return JsonResponse({
-            "status": "error",
-            "provider": "ollama",
-            "model": ollama_model,
-
-            "message": (
-                "Ollama returned an invalid JSON response."
-            ),
-
-            "details": result.text[:2000],
-        }, status=502)
-
-    # --------------------------------------------------------
-    # GET MODEL RESPONSE
-    # --------------------------------------------------------
-
-    raw_response = response_body.get(
-        "response"
-    )
-
-    if not raw_response:
-
-        return JsonResponse({
-            "status": "error",
-            "provider": "ollama",
-            "model": ollama_model,
-
-            "message": (
-                "Ollama returned an empty AI response."
-            ),
-
-            "details": response_body,
-        }, status=502)
-
-    # --------------------------------------------------------
-    # CLEAN RESPONSE
-    # --------------------------------------------------------
+    # Clean Markdown formatting if present
+    if raw_response.startswith("```json"):
+        raw_response = raw_response[7:]
+    elif raw_response.startswith("```"):
+        raw_response = raw_response[3:]
+    if raw_response.endswith("```"):
+        raw_response = raw_response[:-3]
 
     raw_response = raw_response.strip()
 
-    # Handle ```json ... ```
-    if raw_response.startswith(
-        "```json"
-    ):
-
-        raw_response = raw_response[
-            7:
-        ]
-
-    # Handle ``` ... ```
-    elif raw_response.startswith(
-        "```"
-    ):
-
-        raw_response = raw_response[
-            3:
-        ]
-
-    if raw_response.endswith(
-        "```"
-    ):
-
-        raw_response = raw_response[
-            :-3
-        ]
-
-    raw_response = raw_response.strip()
-
-    # --------------------------------------------------------
-    # PARSE AI JSON
-    # --------------------------------------------------------
-
     try:
-
-        insights = json.loads(
-            raw_response
-        )
-
+        insights = json.loads(raw_response)
     except json.JSONDecodeError:
-
         return JsonResponse({
             "status": "error",
-            "provider": "ollama",
-            "model": ollama_model,
-
-            "message": (
-                "Ollama responded successfully, "
-                "but the AI response was not valid JSON."
-            ),
-
+            "provider": "google-gemini",
+            "model": gemini_model,
+            "message": "Gemini responded successfully, but the output was not valid JSON.",
             "raw_response": raw_response[:5000],
         }, status=502)
 
-    # --------------------------------------------------------
-    # VALIDATE AI STRUCTURE
-    # --------------------------------------------------------
-
-    if not isinstance(
-        insights,
-        dict,
-    ):
-
+    if not isinstance(insights, dict):
         return JsonResponse({
             "status": "error",
-            "provider": "ollama",
-            "model": ollama_model,
-
-            "message": (
-                "The AI response must be a JSON object."
-            ),
-
+            "provider": "google-gemini",
+            "model": gemini_model,
+            "message": "The AI response must be a JSON object.",
             "raw_response": raw_response[:5000],
         }, status=502)
 
-    # --------------------------------------------------------
-    # SAVE INSIGHTS TO DATABASE
-    # --------------------------------------------------------
+    # Save insights to PostgreSQL database if audit_id exists
     if audit_id:
         try:
             record = WebsiteAudit.objects.get(id=audit_id)
             record.ai_insights = insights
             record.save()
         except WebsiteAudit.DoesNotExist:
-            pass  # Fails gracefully if the ID doesn't exist
-
-    # --------------------------------------------------------
-    # SUCCESS
-    # --------------------------------------------------------
+            pass
 
     return JsonResponse({
         "status": "success",
-        "provider": "ollama",
-        "model": ollama_model,
+        "provider": "google-gemini",
+        "model": gemini_model,
         "insights": insights,
     })
