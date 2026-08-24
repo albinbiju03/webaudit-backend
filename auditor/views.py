@@ -737,7 +737,7 @@ def ai_insights(request):
 
     gemini_model = os.environ.get(
         "GEMINI_MODEL",
-        "gemini-2.0-flash",
+        "gemini-3.6-flash",  
     )
 
     try:
