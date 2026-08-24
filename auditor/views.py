@@ -721,11 +721,6 @@ def analyze_website(request):
 
 @csrf_exempt
 def ai_insights(request):
-    """
-    Generate AI-powered insights from an existing
-    website audit using Google Gemini SDK.
-    """
-
     if request.method != "POST":
         return JsonResponse({
             "status": "error",
@@ -781,48 +776,12 @@ def ai_insights(request):
     }
 
     prompt = f"""
-You are a senior technical SEO, accessibility,
-security, and web-performance consultant.
-
-Analyze the website audit data below.
-
-Return ONLY valid JSON.
-
-Do not use Markdown formatting blocks like ```json.
-Do not add explanations outside the JSON object.
-
-The JSON must contain exactly these top-level keys:
-
-summary
-priority_actions
-seo_explanation
-technical_explanation
-performance_explanation
-accessibility_explanation
-security_explanation
-
-The "summary" value must be a concise explanation
-of the website's overall condition.
-
-"priority_actions" must be an array of objects.
-
-Every priority_actions object must contain:
-
-priority
-issue
-why_it_matters
-action
-
-"priority" must be one of:
-
-high
-medium
-low
-
-Use only information supported by the audit data.
+You are a senior technical SEO, accessibility, security, and web-performance consultant.
+Analyze the website audit data below and return ONLY valid JSON with these exact keys:
+summary, priority_actions, seo_explanation, technical_explanation, performance_explanation, accessibility_explanation, security_explanation.
+Priority actions must be an array of objects with keys: priority (high/medium/low), issue, why_it_matters, action.
 
 Audit data:
-
 {json.dumps(compact, ensure_ascii=False, indent=2)}
 """.strip()
 
@@ -834,20 +793,26 @@ Audit data:
         )
         
         if not response or not hasattr(response, "text") or not response.text:
-            raise Exception("Empty response received from Google Gemini model.")
+            return JsonResponse({
+                "status": "unavailable",
+                "provider": "google-gemini",
+                "model": gemini_model,
+                "message": "Gemini returned an empty response.",
+                "details": str(response)
+            }, status=503)
             
         raw_response = response.text.strip()
 
     except Exception as error:
+        # This will now display the exact Python exception message on your website UI!
         return JsonResponse({
             "status": "unavailable",
             "provider": "google-gemini",
             "model": gemini_model,
-            "message": "Failed to generate AI insights from Google Gemini.",
-            "details": str(error),
+            "message": f"Gemini API Error: {str(error)}",
+            "details": repr(error),
         }, status=503)
 
-    # Clean Markdown formatting if present
     if raw_response.startswith("```json"):
         raw_response = raw_response[7:]
     elif raw_response.startswith("```"):
@@ -859,25 +824,15 @@ Audit data:
 
     try:
         insights = json.loads(raw_response)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as json_err:
         return JsonResponse({
             "status": "error",
             "provider": "google-gemini",
             "model": gemini_model,
-            "message": "Gemini responded successfully, but the output was not valid JSON.",
+            "message": f"JSON Decode Error: {str(json_err)}",
             "raw_response": raw_response[:5000],
         }, status=502)
 
-    if not isinstance(insights, dict):
-        return JsonResponse({
-            "status": "error",
-            "provider": "google-gemini",
-            "model": gemini_model,
-            "message": "The AI response must be a JSON object.",
-            "raw_response": raw_response[:5000],
-        }, status=502)
-
-    # Save insights to PostgreSQL database if audit_id exists
     if audit_id:
         try:
             record = WebsiteAudit.objects.get(id=audit_id)
