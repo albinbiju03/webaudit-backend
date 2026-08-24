@@ -84,7 +84,7 @@ def health_check(request):
 
     gemini_model = os.environ.get(
         "GEMINI_MODEL",
-        "gemini-2.5-flash",
+        "gemini-2.0-flash",
     )
 
     return JsonResponse({
@@ -742,7 +742,7 @@ def ai_insights(request):
 
     gemini_model = os.environ.get(
         "GEMINI_MODEL",
-        "gemini-2.5-flash",
+        "gemini-2.0-flash",
     )
 
     try:
@@ -832,7 +832,11 @@ Audit data:
             model=gemini_model,
             contents=prompt,
         )
-        raw_response = (response.text or "").strip()
+        
+        if not response or not hasattr(response, "text") or not response.text:
+            raise Exception("Empty response received from Google Gemini model.")
+            
+        raw_response = response.text.strip()
 
     except Exception as error:
         return JsonResponse({
