@@ -84,7 +84,7 @@ def health_check(request):
 
     gemini_model = os.environ.get(
         "GEMINI_MODEL",
-        "gemini-2.0-flash",
+        "gemini-2.5-flash",
     )
 
     return JsonResponse({
@@ -737,7 +737,7 @@ def ai_insights(request):
 
     gemini_model = os.environ.get(
         "GEMINI_MODEL",
-        "gemini-3.6-flash",  
+        "gemini-2.5-flash",  
     )
 
     try:
@@ -791,7 +791,7 @@ Audit data:
             model=gemini_model,
             contents=prompt,
         )
-        
+
         if not response or not hasattr(response, "text") or not response.text:
             return JsonResponse({
                 "status": "unavailable",
@@ -800,11 +800,10 @@ Audit data:
                 "message": "Gemini returned an empty response.",
                 "details": str(response)
             }, status=503)
-            
+
         raw_response = response.text.strip()
 
     except Exception as error:
-        # This will now display the exact Python exception message on your website UI!
         return JsonResponse({
             "status": "unavailable",
             "provider": "google-gemini",
