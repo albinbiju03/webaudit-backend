@@ -1,8 +1,7 @@
-django
-requests
-beautifulsoup4
-gunicorn
-whitenoise
-dj-database-url
-psycopg2-binary
-django-cors-headers
+Django>=6.1,<6.2
+djangorestframework>=3.16
+django-cors-headers>=4.9
+requests>=2.32
+beautifulsoup4>=4.14
+whitenoise>=6.11
+gunicorn>=23.0

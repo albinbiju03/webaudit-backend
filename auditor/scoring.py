@@ -2011,7 +2011,6 @@ def analyze_recommendation_stats(
 # ============================================================
 # AUDIT SUMMARY
 # ============================================================
-
 def create_audit_summary(
     overall_score,
     score_grade,

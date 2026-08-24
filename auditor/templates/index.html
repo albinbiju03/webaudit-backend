@@ -1,39 +1,23 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebAuditAI — Backend Engine</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WebAuditAI API</title>
+  <style>
+    body{margin:0;background:#070b14;color:#fff;font-family:Arial,sans-serif;display:grid;place-items:center;min-height:100vh}
+    main{max-width:650px;padding:40px;text-align:center}
+    .badge{display:inline-block;padding:8px 14px;border:1px solid #10b98155;border-radius:999px;color:#34d399;background:#10b98118}
+    h1{font-size:42px;margin:20px 0 10px}
+    p{color:#94a3b8;line-height:1.7}
+    code{color:#67e8f9}
+  </style>
 </head>
-<body class="bg-[#070b14] text-white flex items-center justify-center min-h-screen overflow-hidden m-0">
-
-    <div class="relative flex flex-col items-center justify-center text-center p-8">
-        <!-- Glowing Background Ambient Blur -->
-        <div class="absolute -z-10 h-72 w-72 rounded-full bg-cyan-500/20 blur-[100px] animate-pulse"></div>
-
-        <!-- Floating Animated Core -->
-        <div class="relative mb-8 flex h-24 w-24 items-center justify-center">
-            <!-- Outer spinning ring -->
-            <div class="absolute inset-0 rounded-full border-2 border-dashed border-cyan-500/40 animate-[spin_10s_linear_infinite]"></div>
-            <!-- Inner pulsing core -->
-            <div class="h-12 w-12 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-600 shadow-[0_0_30px_rgba(34,211,238,0.5)] animate-bounce"></div>
-        </div>
-
-        <!-- Status Text -->
-        <h1 class="text-2xl font-bold tracking-tight mb-2">
-            Backend API <span class="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">Online</span>
-        </h1>
-        <p class="text-sm text-gray-400 max-w-sm">
-            Neural scraping engine active. Waiting for secure payload requests from Next.js frontend.
-        </p>
-
-        <!-- Live Status Pill -->
-        <div class="mt-6 flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1.5 text-xs font-medium text-emerald-400">
-            <span class="h-2 w-2 rounded-full bg-emerald-400 animate-ping"></span>
-           All GOOD
-        </div>
-    </div>
-
+<body>
+<main>
+  <div class="badge">● API ONLINE</div>
+  <h1>WebAuditAI Backend</h1>
+  <p>The Django audit engine is running. Use <code>/api/health/</code> for health checks and <code>/api/analyze/</code> for website audits.</p>
+</main>
 </body>
 </html>
