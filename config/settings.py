@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -58,16 +59,20 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
+# ---------------------------------------------------------------------------
+# DATABASE CONFIGURATION (Supports local fallback & Render cloud database)
+# ---------------------------------------------------------------------------
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": "ai_website_auditor",
-        "USER": "postgres",
-        "PASSWORD": "Albinpost@123",
-        "HOST": "localhost",
-        "PORT": "5432",
-    }
+    "default": dj_database_url.config(
+        default=os.environ.get(
+            "DATABASE_URL",
+            "postgresql://postgres:Albinpost@123@localhost:5432/ai_website_auditor"
+        ),
+        conn_max_age=600,
+        ssl_require=not DEBUG,
+    )
 }
+
 AUTH_PASSWORD_VALIDATORS = []
 
 LANGUAGE_CODE = "en-us"
