@@ -84,7 +84,7 @@ def health_check(request):
 
     gemini_model = os.environ.get(
         "GEMINI_MODEL",
-        "gemini-2.5-flash",
+        "gemini-3.6-flash",
     )
 
     return JsonResponse({
@@ -737,7 +737,7 @@ def ai_insights(request):
 
     gemini_model = os.environ.get(
         "GEMINI_MODEL",
-        "gemini-2.5-flash",  
+        "gemini-3.6-flash",  
     )
 
     try:
